@@ -2,7 +2,7 @@
 title: "Predicting Exercise Classification from Movement Tracker Data"
 author: "Jerry Lakin"
 date: "4/12/2021"
-output: html_document
+output: pdf_document
 ---
 
 ```{r setup, include=FALSE}
