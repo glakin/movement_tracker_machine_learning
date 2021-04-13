@@ -1,0 +1,134 @@
+---
+title: "Predicting Exercise Classification from Movement Tracker Data"
+author: "Jerry Lakin"
+date: "4/12/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Introduction
+
+The wide proliferation of wearable fitness devices in recent years has made personal activity data accessible in large quantities. It is important to be able to detect not only the amount of activity performed by the wearer of a device but also the manner in which it was performed. In this project we will be using data from personal fitness devices to classify the method by which test participants perform barbell lifts. 
+
+The training data for this project are available here:
+
+https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv
+
+The test data are available here:
+
+https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv
+
+## Loading Libraries and Data
+
+First load the libraries and set our see.
+
+```{r libs, results='hide', message=FALSE, warning=FALSE}
+library(caret)
+library(rattle)
+
+set.seed(1010)
+```
+
+Next pull in the data.
+
+```{r data}
+dat <- read.csv('https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv', na.strings=c("","NA"))
+testing_dat <- read.csv('https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv')
+```
+
+## Preprocessing Data & Setting up for Cross-Validation
+
+Remove all null columns.
+
+```{r nulls}
+dat <- dat[, colSums(is.na(dat)) == 0]
+testing_dat <- testing_dat[, colSums(is.na(testing_dat)) == 0]
+```
+
+Next remove the first 7 columns containing metadata that will not be useful for classification.
+
+```{r meta}
+dat_f <- dat[, -c(1:7)]
+testing <- testing_dat[, -c(1:7)]
+```
+
+Finally split the primary data set into training and validation sets. The validation set will be used to determine the quality of the models while the testing set will not be used until the final model has been selected.
+
+```{r train}
+inTrain <- createDataPartition(y=dat_f$classe, p=0.7, list=FALSE)
+
+training <- dat_f[inTrain,]
+validation <- dat_f[-inTrain,]
+```
+
+Before we begin to train our models, we will want to set up our trainControl object which we will use to perform cross-validation.
+
+```{r cv}
+control <- trainControl(method = "cv", number=3, verboseIter=F)
+```
+
+## Decision Tree
+
+As a first pass we will train and visualize a decision tree model and test it on our validation set. First we want to train the model with our training set.
+
+```{r dt}
+fit_trees <- train(classe ~ ., data=training, method="rpart", trControl=control, tuneLength=3)
+```
+
+Next we will take a look at the visualization to see how the decision tree makes predictions.
+
+```{r dt_plot}
+fancyRpartPlot(fit_trees$finalModel)
+```
+
+In the figure we can see the variables and thresholds that the model has chosen in order to make decisions. For example if the roll_belt variable is greater than 131, the trial will be classified as E. if the roll_belt is less than 131 and the pitch_forearm variable is less than -34, the trial will be classified as A, etc. 
+
+Next we will use the model to make predictions on our validation set and see how it performs by looking at the confusion matrix.
+
+```{r dt_pred}
+pred_trees <- predict(fit_trees, validation)
+cm_trees <- confusionMatrix(pred_trees, factor(validation$classe))
+cm_trees
+```
+
+## Random Forest
+
+Next we will train a model using a random forest. This is a more robust model and should therefore provide a more accurate prediction.
+
+```{r rf}
+fit_rf <- train(classe ~ ., data=training, method="rf", trControl=control, tuneLength=3)
+```
+
+Next we use the model to generate predictions on our validation set and look at the results.
+
+```{r rf_pred}
+pred_rf <- predict(fit_rf, validation)
+cm_rf <- confusionMatrix(pred_rf, factor(validation$classe))
+cm_rf
+```
+
+We can see that this model is highly accurate compared to our decision tree model, with accuracy exceeding 99%. This should be a much better model for use to generate final predictions on our testing set.
+
+## Final Results
+
+Finally, we use our random forest model to generate predicions on the testing set, containing data that neither of our models has seen to this point.
+
+```{r final}
+pred_final <- predict(fit_rf, testing)
+pred_final
+```
+
+## Appendix
+
+For cross-validation purposes we will plot our models' accuracy.
+
+```{r tree_plot}
+plot(fit_trees)
+```
+
+```{r rf_plot}
+plot(fit_rf)
+```
